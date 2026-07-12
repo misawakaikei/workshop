@@ -484,10 +484,13 @@ function App() {
         input,select,textarea,button{font-family:inherit}
         *:focus-visible{outline:2px solid #26215C;outline-offset:1px}
         .print-only{display:none}
+        @page{size:A4 portrait;margin:12mm}
         @media print{
           .print-hide{display:none !important}
           .print-only{display:block}
-          body{background:#fff}
+          body{background:#fff !important}
+          .max-w-5xl{max-width:100% !important}
+          .rounded-xl{break-inside:avoid}
         }
       `}</style>
       <div className="max-w-5xl mx-auto px-4 py-6">
@@ -522,14 +525,14 @@ function App() {
           </div>
         </div>
         {confirmReset && (
-          <div className="flex flex-wrap items-center gap-3 mb-4 rounded-xl px-4 py-3" style={{ background: "#FBEDED", border: "1.5px solid #E4B1B1" }}>
+          <div className="print-hide flex flex-wrap items-center gap-3 mb-4 rounded-xl px-4 py-3" style={{ background: "#FBEDED", border: "1.5px solid #E4B1B1" }}>
             <span className="text-sm font-bold" style={{ color: "#A32D2D" }}>仕訳とメモをすべて消して、期首からやり直します。よろしいですか?</span>
             <button onClick={performReset} className="rounded-lg px-3 py-1.5 text-sm font-bold text-white" style={{ background: "#A32D2D" }}>消してやり直す</button>
             <button onClick={() => setConfirmReset(false)} className="rounded-lg px-3 py-1.5 text-sm font-bold" style={{ border: "1.5px solid #5F5E5A", color: "#5F5E5A", background: "transparent" }}>やめる</button>
           </div>
         )}
         {confirmPresent && tab !== "present" && preset && (
-          <div className="flex flex-wrap items-center gap-3 mb-4 rounded-xl px-4 py-3" style={{ background: "#EEEDFE", border: "1.5px solid #B9B4E8" }}>
+          <div className="print-hide flex flex-wrap items-center gap-3 mb-4 rounded-xl px-4 py-3" style={{ background: "#EEEDFE", border: "1.5px solid #B9B4E8" }}>
             <span className="text-sm font-bold" style={{ color: "#26215C" }}>
               まだお題の仕訳が残っています(クリア {checkResults.cleared}／{preset.missions.length})。このままプレゼン画面へ進みますか?
             </span>
@@ -740,6 +743,13 @@ function App() {
               <button onClick={saveImage} disabled={capturing} className="rounded-lg px-4 py-2 text-sm font-bold text-white" style={{ background: "#26215C", opacity: capturing ? 0.6 : 1 }}>
                 {capturing ? "保存中…" : "画像で保存(PNG)"}
               </button>
+              <button onClick={() => {
+                  try { window.print(); }
+                  catch (e) { setSaveMsg("この環境では印刷が使えません。公開ページ(GitHub Pages)で開くと使えます。"); }
+                }}
+                className="rounded-lg px-4 py-2 text-sm font-bold text-white" style={{ background: "#26215C" }}>
+                PDFで保存(印刷)
+              </button>
             </div>
             <div ref={presentRef}>
             <div className="rounded-xl p-5 mb-4" style={{ background: "#fff", border: "1.5px solid #E2E1DB" }}>
@@ -801,16 +811,19 @@ function App() {
                   {capturing ? (
                     <div className="text-sm whitespace-pre-wrap rounded-lg p-2" style={{ border: "1.5px solid #CFCEC8", background: "#fff", minHeight: 110 }}>{memo[k] || "(記入なし)"}</div>
                   ) : (
-                    <textarea value={memo[k]} onChange={(e) => setMemo({ ...memo, [k]: e.target.value })}
-                      placeholder={ph} rows={5} className="w-full rounded-lg p-2 text-sm resize-none"
-                      style={{ border: "1.5px solid #CFCEC8", background: "#FAFAF6" }} />
+                    <>
+                      <textarea value={memo[k]} onChange={(e) => setMemo({ ...memo, [k]: e.target.value })}
+                        placeholder={ph} rows={5} className="w-full rounded-lg p-2 text-sm resize-none print-hide"
+                        style={{ border: "1.5px solid #CFCEC8", background: "#FAFAF6" }} />
+                      <div className="print-only text-sm whitespace-pre-wrap" style={{ minHeight: 40 }}>{memo[k] || "(記入なし)"}</div>
+                    </>
                   )}
                 </div>
               ))}
             </div>
             </div>
             <div className="text-[11px] mt-3 print-hide" style={{ color: "#5F5E5A" }}>
-              会社の選択・仕訳・メモは同じ端末・同じブラウザなら自動保存されます(再読み込みしても復元)。ただし端末を変えると引き継がれないので、発表が終わったら「画像で保存(PNG)」でこの画面を残しておきましょう。記録を消すには右上のリセットを使います。
+              会社の選択・仕訳・メモは同じ端末・同じブラウザなら自動保存されます(再読み込みしても復元)。発表が終わったら「PDFで保存(印刷)」→送信先で「PDFに保存」を選ぶとA4のファイルとして残せます(そのまま印刷もOK)。画像がよければ「画像で保存(PNG)」を。記録を消すには右上のリセットを使います。
             </div>
           </div>
         )}
