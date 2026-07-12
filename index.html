@@ -13,7 +13,7 @@
 <body>
 <div id="root"></div>
 <script type="text/babel" data-presets="react">
-const { useState, useMemo, useRef } = React;
+const { useState, useMemo, useRef, useEffect } = React;
 
 // ---- account metadata (colors identical to the printed cards) ----
 const ACC = {
@@ -326,10 +326,19 @@ function PLTrend({ preset, bal }) {
   );
 }
 
+// ---- ブラウザ保存(使えない環境では自動的に無効化) ----
+const STORE_KEY = "shiwake-box-sim-v1";
+const store = {
+  get() { try { return JSON.parse(window.localStorage.getItem(STORE_KEY)); } catch (e) { return null; } },
+  set(v) { try { window.localStorage.setItem(STORE_KEY, JSON.stringify(v)); } catch (e) { /* 保存不可環境では何もしない */ } },
+};
+
 function App() {
-  const [tab, setTab] = useState("select");
-  const [companyKey, setCompanyKey] = useState(null);
-  const [entries, setEntries] = useState([]);
+  const saved = useMemo(() => store.get() || {}, []);
+  const [tab, setTab] = useState(saved.companyKey ? "input" : "select");
+  const [companyKey, setCompanyKey] = useState(saved.companyKey || null);
+  const [entries, setEntries] = useState(saved.entries || []);
+  const [confirmPresent, setConfirmPresent] = useState(false);
   const [d, setD] = useState("現金預金");
   const [c, setC] = useState("売上");
   const [amt, setAmt] = useState(10);
@@ -341,7 +350,7 @@ function App() {
   const [capturing, setCapturing] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
   const presentRef = useRef(null);
-  const [memo, setMemo] = useState({ year: "", worry: "", advice: "" });
+  const [memo, setMemo] = useState(saved.memo || { year: "", worry: "", advice: "" });
 
   const preset = companyKey ? PRESETS[companyKey] : null;
   const start = useMemo(() => (preset ? { ...preset.a, ...preset.l, 純資産: preset.eq } : null), [companyKey]);
@@ -374,6 +383,11 @@ function App() {
     });
     return { res, cleared: res.filter((r) => r && r.mark === "○").length };
   }, [entries, companyKey]);
+
+  // 自動保存: 会社・仕訳・メモを同じ端末のブラウザに保存
+  useEffect(() => {
+    if (companyKey) store.set({ companyKey, entries, memo });
+  }, [companyKey, entries, memo]);
 
   const addEntry = (entry) => {
     setErr("");
@@ -485,7 +499,20 @@ function App() {
           <div className="flex gap-2 flex-wrap">
             {navBtn("select", "① 会社を選ぶ")}
             {navBtn("input", "② 仕訳を入力", !companyKey)}
-            {navBtn("present", "③ 社長にプレゼン", !companyKey)}
+            <button onClick={() => {
+                if (!companyKey || tab === "present") return;
+                if (checkResults.cleared >= preset.missions.length) { setTab("present"); setConfirmPresent(false); }
+                else setConfirmPresent(true);
+              }}
+              className="px-3 py-1.5 rounded-full text-sm font-bold print-hide"
+              style={{
+                background: tab === "present" ? "#26215C" : "transparent",
+                color: tab === "present" ? "#fff" : !companyKey ? "#B4B3AE" : "#26215C",
+                border: "1.5px solid " + (tab === "present" ? "#26215C" : !companyKey ? "#D9D8D2" : "#26215C"),
+                cursor: !companyKey ? "not-allowed" : "pointer",
+              }}>
+              ③ 社長にプレゼン
+            </button>
             {companyKey && (
               <button onClick={() => setConfirmReset(!confirmReset)} className="px-3 py-1.5 rounded-full text-sm font-bold print-hide"
                 style={{ border: "1.5px solid #A32D2D", color: "#A32D2D", background: "transparent" }}>
@@ -501,15 +528,27 @@ function App() {
             <button onClick={() => setConfirmReset(false)} className="rounded-lg px-3 py-1.5 text-sm font-bold" style={{ border: "1.5px solid #5F5E5A", color: "#5F5E5A", background: "transparent" }}>やめる</button>
           </div>
         )}
+        {confirmPresent && tab !== "present" && preset && (
+          <div className="flex flex-wrap items-center gap-3 mb-4 rounded-xl px-4 py-3" style={{ background: "#EEEDFE", border: "1.5px solid #B9B4E8" }}>
+            <span className="text-sm font-bold" style={{ color: "#26215C" }}>
+              まだお題の仕訳が残っています(クリア {checkResults.cleared}／{preset.missions.length})。このままプレゼン画面へ進みますか?
+            </span>
+            <button onClick={() => { setTab("present"); setConfirmPresent(false); }} className="rounded-lg px-3 py-1.5 text-sm font-bold text-white" style={{ background: "#26215C" }}>進む</button>
+            <button onClick={() => setConfirmPresent(false)} className="rounded-lg px-3 py-1.5 text-sm font-bold" style={{ border: "1.5px solid #5F5E5A", color: "#5F5E5A", background: "transparent" }}>仕訳にもどる</button>
+          </div>
+        )}
 
         {/* ---------- STEP 1 ---------- */}
         {tab === "select" && (
           <div>
-            <p className="text-sm mb-4">業種当てゲームで使った6社から、担当する会社を1社選んでください。選んだ会社の「新しい1年」が始まります(P/Lはゼロからスタート)。</p>
+            <p className="text-sm mb-4">業種当てゲームで使った6社から、担当する会社を1社選んでください。選んだ会社の「新しい1年」が始まります。今期の売上と費用はゼロからスタートします。</p>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {Object.entries(PRESETS).map(([k, p]) => (
                 <button key={k}
-                  onClick={() => { setCompanyKey(k); setEntries([]); setMemo({ year: "", worry: "", advice: "" }); setTab("input"); }}
+                  onClick={() => {
+                    if (companyKey === k) { setTab("input"); return; }
+                    setCompanyKey(k); setEntries([]); setMemo({ year: "", worry: "", advice: "" }); setConfirmPresent(false); setTab("input");
+                  }}
                   className="rounded-xl p-4 text-left hover:shadow-md transition-shadow"
                   style={{ background: "#fff", border: companyKey === k ? "2.5px solid #26215C" : "1.5px solid #E2E1DB" }}>
                   <div className="font-extrabold mb-2" style={{ color: "#26215C" }}>{p.name}</div>
@@ -731,6 +770,16 @@ function App() {
               </div>
             </div>
 
+            <div className="rounded-xl p-4 mb-4" style={{ background: "#fff", border: "2px solid #26215C" }}>
+              <div className="font-extrabold text-sm mb-2" style={{ color: "#26215C" }}>👀 数字を見る3つの視点(まずここから)</div>
+              <div className="text-[14px] mb-1">□ ① 利益は出ている?(P/Lのいちばん下の緑の箱)</div>
+              <div className="text-[14px] mb-1">□ ② 現金は増えた? 減った?(B/S左上・現金預金の箱の増減)</div>
+              <div className="text-[14px] mb-2">□ ③ 大きく変わった箱はある?(売掛金・在庫・借入金・買掛金)</div>
+              <div className="text-[13px] font-bold rounded-lg px-3 py-2" style={{ background: "#EEEDFE", color: "#26215C" }}>
+                ヒント: 利益が出ていても、現金が少ない会社があります。①と②の答えがちがったら、③で理由を探してみよう。
+              </div>
+            </div>
+
             <div className="rounded-xl p-4 mb-4" style={{ background: "#FFF9E9", border: "1.5px solid #EFD9A0" }}>
               <div className="font-extrabold text-sm mb-1" style={{ color: "#6B4E00" }}>📎 アドバイスを考えるためのメモ</div>
               <div className="text-[13px] mb-2" style={{ color: "#4A3B10" }}>{preset.bench}</div>
@@ -761,7 +810,7 @@ function App() {
             </div>
             </div>
             <div className="text-[11px] mt-3 print-hide" style={{ color: "#5F5E5A" }}>
-              「画像で保存(PNG)」でこの画面全体を1枚の画像として保存できます。メモは画面を再読み込みすると消えるので、発表が終わったら保存を忘れずに。
+              会社の選択・仕訳・メモは同じ端末・同じブラウザなら自動保存されます(再読み込みしても復元)。ただし端末を変えると引き継がれないので、発表が終わったら「画像で保存(PNG)」でこの画面を残しておきましょう。記録を消すには右上のリセットを使います。
             </div>
           </div>
         )}
