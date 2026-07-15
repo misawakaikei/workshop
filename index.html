@@ -851,6 +851,16 @@ function App() {
             </div>
           </div>
         )}
+
+        {/* ---------- 応用編への常設リンク(①以外の画面で表示・印刷時は非表示) ---------- */}
+        {tab !== "select" && (
+          <div className="print-hide mt-8 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3" style={{ background: "#EEEDFE", border: "1.5px solid #B9B4E8" }}>
+            <span className="text-[12px] font-bold" style={{ color: "#26215C" }}>
+              🎁 応用編「箱でわかる会社のカタチ ― 有名企業くらべ」は、その場でも、おうちに帰ってからでも挑戦できます
+            </span>
+            <a href="./ouyou/" className="shrink-0 rounded-full px-4 py-1.5 text-sm font-bold text-white" style={{ background: "#26215C" }}>応用編へ →</a>
+          </div>
+        )}
       </div>
     </div>
   );
