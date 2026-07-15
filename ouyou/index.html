@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>応用編｜箱でわかる会社のカタチ ― 有名企業くらべ</title>
+<meta name="description" content="任天堂vsソニー、ニトリvsイオン。実際の決算書の数字で、会社のカタチ(貸借対照表)を箱にして比べてみよう。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F6F8F7;
+  --grid:#DDE7E3;
+  --ink:#26343B;
+  --ink-soft:#5C6B72;
+  --asset:#4E86B0;
+  --asset-deep:#2F5F86;
+  --debt:#D97F66;
+  --debt-deep:#B85A42;
+  --equity:#5FA383;
+  --equity-deep:#3D7A5E;
+  --marker:#FFE27A;
+  --card:#FFFFFF;
+  --line:#C8D4CF;
+  --radius:14px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html{scroll-behavior:smooth;}
+body{
+  font-family:"Zen Kaku Gothic New",-apple-system,"Hiragino Kaku Gothic ProN",sans-serif;
+  color:var(--ink);
+  background-color:var(--paper);
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size:24px 24px;
+  line-height:1.75;
+  font-size:15.5px;
+}
+.wrap{max-width:760px;margin:0 auto;padding:0 16px 80px;}
+h1,h2,h3,.disp{font-family:"Zen Maru Gothic","Zen Kaku Gothic New",sans-serif;}
+
+/* header */
+header{padding:36px 0 8px;}
+.eyebrow{
+  display:inline-block;background:var(--ink);color:#fff;
+  font-size:12px;letter-spacing:.18em;padding:4px 12px;border-radius:999px;
+  font-weight:700;margin-bottom:12px;
+}
+h1{font-size:clamp(24px,6vw,34px);font-weight:900;line-height:1.35;}
+h1 .sub{display:block;font-size:.55em;color:var(--ink-soft);font-weight:700;margin-top:4px;letter-spacing:.06em;}
+.lead{margin-top:14px;color:var(--ink-soft);font-size:14.5px;}
+.lead b{color:var(--ink);}
+
+/* recap card */
+.recap{
+  margin-top:22px;background:var(--card);border:1.5px solid var(--line);
+  border-radius:var(--radius);padding:18px 18px 20px;
+}
+.recap h2{font-size:16px;margin-bottom:10px;}
+.recap h2 span{background:linear-gradient(transparent 62%, var(--marker) 62%);padding:0 2px;}
+.minibs{display:flex;gap:4px;height:120px;margin:12px 0 10px;max-width:340px;}
+.minibs .a{flex:1;background:var(--asset);border-radius:8px 0 0 8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;flex-direction:column;gap:2px;}
+.minibs .r{flex:1;display:flex;flex-direction:column;gap:4px;}
+.minibs .d{flex:1.1;background:var(--debt);border-radius:0 8px 0 0;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;flex-direction:column;gap:2px;}
+.minibs .e{flex:1;background:var(--equity);border-radius:0 0 8px 0;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;flex-direction:column;gap:2px;}
+.minibs small{font-size:10px;font-weight:500;opacity:.9;}
+.recap p{font-size:13.5px;color:var(--ink-soft);}
+.recap p b{color:var(--ink);}
+
+/* matchup tabs */
+.tabs{display:flex;gap:8px;margin:30px 0 0;position:sticky;top:8px;z-index:30;}
+.tab{
+  flex:1;border:2px solid var(--ink);background:var(--card);color:var(--ink);
+  font-family:"Zen Maru Gothic",sans-serif;font-weight:700;font-size:14px;
+  padding:10px 6px;border-radius:999px;cursor:pointer;transition:all .18s;
+  box-shadow:0 2px 0 var(--ink);
+}
+.tab[aria-selected="true"]{background:var(--ink);color:#fff;transform:translateY(2px);box-shadow:0 0 0 var(--ink);}
+.tab small{display:block;font-size:10px;font-weight:500;letter-spacing:.08em;}
+
+/* matchup section */
+.match{display:none;margin-top:24px;}
+.match.active{display:block;animation:fadeup .35s ease;}
+@keyframes fadeup{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:none;}}
+.match-head{background:var(--card);border:1.5px solid var(--line);border-radius:var(--radius);padding:16px 18px;margin-bottom:18px;}
+.match-head h2{font-size:19px;font-weight:900;}
+.match-head p{font-size:13.5px;color:var(--ink-soft);margin-top:6px;}
+
+/* scale toggle */
+.scale-toggle{
+  display:flex;background:var(--card);border:1.5px solid var(--line);
+  border-radius:999px;padding:4px;margin:0 auto 6px;max-width:400px;
+}
+.scale-toggle button{
+  flex:1;border:none;background:transparent;font-family:inherit;font-weight:700;
+  font-size:13px;padding:9px 4px;border-radius:999px;cursor:pointer;color:var(--ink-soft);
+  transition:all .18s;
+}
+.scale-toggle button.on{background:var(--marker);color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--ink);}
+.scale-note{text-align:center;font-size:12px;color:var(--ink-soft);margin-bottom:14px;min-height:1.6em;}
+
+/* boxes area */
+.arena{
+  background:var(--card);border:1.5px solid var(--line);border-radius:var(--radius);
+  padding:22px 14px 14px;
+}
+.boxes{display:flex;gap:14px;align-items:flex-end;justify-content:center;}
+.company{flex:1;max-width:280px;display:flex;flex-direction:column;justify-content:flex-end;}
+.c-name{text-align:center;font-family:"Zen Maru Gothic",sans-serif;font-weight:900;font-size:16px;line-height:1.3;}
+.c-total{text-align:center;font-size:12px;color:var(--ink-soft);margin-bottom:8px;}
+.c-total b{color:var(--ink);font-size:14px;}
+.bsbox{
+  display:flex;gap:3px;width:100%;
+  transition:height .6s cubic-bezier(.5,1.4,.4,1);
+  cursor:pointer;
+}
+.bsbox .col{display:flex;flex-direction:column;gap:3px;flex:1;height:100%;}
+.seg{
+  border-radius:6px;color:#fff;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;overflow:hidden;
+  font-weight:700;font-size:12.5px;line-height:1.35;text-align:center;
+  transition:flex .6s cubic-bezier(.5,1.4,.4,1), filter .15s;
+  min-height:0;padding:2px;
+}
+.bsbox:active .seg{filter:brightness(1.08);}
+.seg small{font-size:10px;font-weight:500;opacity:.92;}
+.seg.asset{background:var(--asset);}
+.seg.debt{background:var(--debt);}
+.seg.equity{background:var(--equity);}
+.seg.hide-label span,.seg.hide-label small{display:none;}
+.ratio-badge{
+  margin-top:10px;text-align:center;font-size:12px;font-weight:700;
+}
+.ratio-badge b{
+  display:inline-block;background:var(--equity);color:#fff;border-radius:999px;
+  padding:2px 12px;font-size:13px;
+}
+.tap-hint{text-align:center;font-size:11.5px;color:var(--ink-soft);margin-top:14px;}
+
+/* detail cards */
+.details{margin-top:16px;display:grid;gap:12px;}
+.dcard{
+  background:var(--card);border:1.5px solid var(--line);border-left-width:6px;
+  border-radius:10px;padding:14px 16px;font-size:13.5px;color:var(--ink-soft);
+  display:none;
+}
+.dcard.show{display:block;animation:fadeup .3s ease;}
+.dcard h3{font-size:15px;color:var(--ink);margin-bottom:6px;}
+.dcard ul{list-style:none;}
+.dcard li{padding-left:1.2em;position:relative;margin-top:4px;}
+.dcard li::before{content:"▸";position:absolute;left:0;color:var(--ink);}
+.dcard b{color:var(--ink);}
+.dcard .num{font-family:"Zen Maru Gothic",sans-serif;font-weight:700;}
+
+/* quiz */
+.quiz{margin-top:34px;}
+.quiz h2{font-size:19px;font-weight:900;margin-bottom:4px;}
+.quiz h2 span{background:linear-gradient(transparent 62%, var(--marker) 62%);padding:0 2px;}
+.quiz .qsub{font-size:13px;color:var(--ink-soft);margin-bottom:14px;}
+.q{
+  background:var(--card);border:1.5px solid var(--line);border-radius:var(--radius);
+  padding:16px 18px;margin-bottom:12px;
+}
+.q .qlabel{
+  display:inline-block;background:var(--ink);color:#fff;font-size:11px;font-weight:700;
+  border-radius:6px;padding:1px 8px;margin-bottom:6px;letter-spacing:.1em;
+}
+.q p.question{font-weight:700;font-size:15px;line-height:1.6;}
+.q .choices{margin-top:10px;display:grid;gap:8px;}
+.q .choices button{
+  text-align:left;border:1.5px solid var(--line);background:var(--paper);
+  border-radius:10px;padding:10px 14px;font-family:inherit;font-size:14px;
+  cursor:pointer;transition:all .15s;color:var(--ink);
+}
+.q .choices button:hover{border-color:var(--ink);}
+.q .choices button.correct{background:var(--marker);border-color:var(--ink);font-weight:700;}
+.q .choices button.wrong{opacity:.45;text-decoration:line-through;}
+.q .answer{
+  display:none;margin-top:12px;border-top:1.5px dashed var(--line);padding-top:12px;
+  font-size:13.5px;color:var(--ink-soft);
+}
+.q .answer.show{display:block;animation:fadeup .3s ease;}
+.q .answer b{color:var(--ink);}
+.q .answer .atag{
+  display:inline-block;background:var(--equity);color:#fff;font-size:11px;font-weight:700;
+  border-radius:6px;padding:1px 8px;margin-bottom:6px;
+}
+
+/* think prompt */
+.think{
+  margin-top:26px;background:#FFF9E3;border:1.5px dashed var(--debt);
+  border-radius:var(--radius);padding:16px 18px;font-size:14px;
+}
+.think h3{font-size:15px;margin-bottom:6px;}
+.think p{color:var(--ink-soft);font-size:13.5px;}
+
+/* footer */
+footer{
+  margin-top:48px;border-top:1.5px solid var(--line);padding-top:18px;
+  font-size:11.5px;color:var(--ink-soft);line-height:1.9;
+}
+footer b{color:var(--ink);}
+.backlink{
+  display:inline-block;margin-top:12px;font-weight:700;color:var(--ink);
+  text-decoration:none;border:1.5px solid var(--ink);border-radius:999px;
+  padding:7px 18px;font-size:13px;background:var(--card);box-shadow:0 2px 0 var(--ink);
+}
+.backlink:active{transform:translateY(2px);box-shadow:none;}
+
+@media (max-width:480px){
+  body{font-size:14.5px;}
+  .boxes{gap:10px;}
+  .seg{font-size:11px;}
+  .seg small{font-size:9px;}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition:none!important;animation:none!important;}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <span class="eyebrow">応用編 ｜ おうちで挑戦</span>
+  <h1>箱でわかる会社のカタチ<span class="sub">― 有名企業を「箱」にして比べてみよう ―</span></h1>
+  <p class="lead">ワークで作った<b>「会社の箱(貸借対照表)」</b>。実は、上場企業の決算書は誰でも見られるので、有名企業の箱も作れます。同じ業界のライバル同士なのに、箱のカタチはぜんぜん違う――そこに<b>経営の考え方の違い</b>が表れます。</p>
+</header>
+
+<section class="recap" aria-label="復習">
+  <h2><span>復習：箱の見方</span></h2>
+  <div class="minibs" aria-hidden="true">
+    <div class="a">資産<small>持っているもの</small></div>
+    <div class="r">
+      <div class="d">負債<small>返すお金</small></div>
+      <div class="e">純資産<small>自分のお金</small></div>
+    </div>
+  </div>
+  <p>左が<b>資産</b>(現金・商品・建物など)。右は、そのお金をどう集めたか。<b>負債</b>はいつか返すお金、<b>純資産</b>は返さなくていい自分のお金。左と右の合計は必ず一致します。右下の<b>純資産の割合(自己資本比率)</b>が大きいほど、借金に頼らない経営です。</p>
+</section>
+
+<div class="tabs" role="tablist">
+  <button class="tab" role="tab" aria-selected="true" data-match="game">🎮 任天堂 vs ソニー<small>ゲーム・エンタメ対決</small></button>
+  <button class="tab" role="tab" aria-selected="false" data-match="retail">🛒 ニトリ vs イオン<small>小売対決</small></button>
+</div>
+
+<!-- ============ 任天堂 vs ソニー ============ -->
+<section class="match active" id="match-game">
+  <div class="match-head">
+    <h2>🎮 任天堂 vs ソニーグループ</h2>
+    <p>どちらもゲーム機を作る会社。でも箱のカタチは正反対です。任天堂は<b>「現金の塊・ほぼ無借金」</b>、ソニーは<b>借りたお金も使って大きく事業を広げる</b>タイプ。どちらが良い・悪いではなく、戦略の違いです。</p>
+  </div>
+
+  <div class="scale-toggle" data-match="game">
+    <button class="on" data-mode="scale">💰 金額のまま比べる</button>
+    <button data-mode="shape">📐 カタチ(割合)で比べる</button>
+  </div>
+  <p class="scale-note" data-note="game">箱の大きさ＝会社が持っている資産の大きさ(総資産)です</p>
+
+  <div class="arena">
+    <div class="boxes" data-boxes="game"></div>
+    <p class="tap-hint">☝ 箱をタップすると、その会社の解説が出ます</p>
+  </div>
+
+  <div class="details" data-details="game">
+    <div class="dcard" data-co="nintendo" style="border-left-color:var(--asset);">
+      <h3>🎮 任天堂 ― 現金の塊、ほぼ無借金の箱</h3>
+      <ul>
+        <li>総資産 <b class="num">約3.8兆円</b>のうち、現金や預金などが <b class="num">約1.3兆円</b>。箱の中身の3分の1がキャッシュ！</li>
+        <li>銀行からの借入(有利子負債)は<b>ほぼゼロ</b>。自己資本比率は <b class="num">77.6%</b>。</li>
+        <li>ゲームソフトはヒットするかどうか読みにくい商売。だから<b>不作の年が続いても耐えられる現金</b>を貯めておく、という考え方。</li>
+        <li>2026年3月期は Switch 2 が大ヒットして売上 <b class="num">約2.3兆円</b>・純利益 <b class="num">約4,240億円</b>。箱(3.8兆円)に対してすごい稼ぐ力。</li>
+      </ul>
+    </div>
+    <div class="dcard" data-co="sony" style="border-left-color:var(--debt);">
+      <h3>🎧 ソニーグループ ― 借りる力も使って大きく攻める箱</h3>
+      <ul>
+        <li>総資産 <b class="num">約15.7兆円</b>。任天堂の<b>約4倍</b>の大きさ。ゲーム・音楽・映画・半導体センサーなど事業がとても幅広い。</li>
+        <li>負債も大きいけれど、自己資本比率は <b class="num">約52%</b>としっかり確保。借入(有利子負債)は <b class="num">約8,800億円</b>。</li>
+        <li>実は2025年10月、銀行・保険の金融子会社を切り離し(スピンオフ)、総資産が <b class="num">35兆円→15.7兆円</b> に半減。<b>会社のカタチは経営判断で大きく変わる</b>好例。</li>
+        <li>映画スタジオや半導体工場など<b>大きな投資が必要な事業</b>では、借りたお金も上手に使うのが普通の戦略。</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="quiz">
+    <h2><span>クイズに挑戦</span></h2>
+    <p class="qsub">箱を見ながら考えてみよう。タップで答え合わせ。</p>
+
+    <div class="q">
+      <span class="qlabel">Q1</span>
+      <p class="question">任天堂が3.8兆円の箱の中に、約1.3兆円もの現金を貯めこんでいるのはなぜ?</p>
+      <div class="choices">
+        <button data-a="0">社長が貯金好きだから</button>
+        <button data-a="1">ヒットが読めない商売なので、不作が続いても困らないため</button>
+        <button data-a="0">銀行が任天堂にはお金を貸してくれないから</button>
+      </div>
+      <div class="answer">
+        <span class="atag">こたえ</span>
+        <p>ゲームは<b>当たり外れの波が大きい商売</b>。新ハードの開発には何年もかかるし、失敗した時期もありました(Wii Uの頃など)。だから「何年か売れなくても研究開発を続けられる現金」を持つのが任天堂の伝統的な考え方です。実際、配当方針にも「成長に必要な研究開発や設備投資等を内部留保資金でまかなうことを原則とする」と書かれています。</p>
+      </div>
+    </div>
+
+    <div class="q">
+      <span class="qlabel">Q2</span>
+      <p class="question">ソニーは任天堂より負債がずっと大きい。これは「危ない会社」ということ?</p>
+      <div class="choices">
+        <button data-a="0">そのとおり。負債が大きい＝危ない</button>
+        <button data-a="1">ちがう。事業に必要なお金を借りて活用するのも立派な戦略</button>
+        <button data-a="0">負債はゼロにするのが法律のルール</button>
+      </div>
+      <div class="answer">
+        <span class="atag">こたえ</span>
+        <p>負債は「悪」ではありません。映画・音楽・半導体のような<b>大きな投資が必要な事業</b>では、借りたお金で先に投資して、稼いで返すのが普通です。大事なのは<b>返せる力とのバランス</b>。ソニーも自己資本比率は約52%あり、健全な水準です。会計事務所の仕事のひとつは、このバランスが崩れていないかをお客様と一緒にチェックすることです。</p>
+      </div>
+    </div>
+
+    <div class="q">
+      <span class="qlabel">Q3</span>
+      <p class="question">「カタチ(割合)で比べる」に切り替えてみよう。任天堂の右下(純資産)の割合は約77.6%。この数字の呼び名は?</p>
+      <div class="choices">
+        <button data-a="0">利益率</button>
+        <button data-a="1">自己資本比率</button>
+        <button data-a="0">消費税率</button>
+      </div>
+      <div class="answer">
+        <span class="atag">こたえ</span>
+        <p><b>自己資本比率</b>(＝純資産÷総資産)。会社の「体力」を示す代表的な数字で、銀行や取引先も必ずチェックします。日本の会社の平均はだいたい40%前後。任天堂の77.6%は超・健康体です。ただし次の「小売対決」で、この数字が<b>単純比較できない</b>ケースも見てみましょう。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="think">
+    <h3>🤔 もっと考えてみよう</h3>
+    <p>もし君が任天堂の社長なら、貯まった1.3兆円の現金をどう使う? ①もっと貯める ②新しい事業に投資する ③株主に配る ④社員の給料を上げる――正解はひとつではありません。実はこれこそ、経営者がいちばん悩んでいることです。</p>
+  </div>
+</section>
+
+<!-- ============ ニトリ vs イオン ============ -->
+<section class="match" id="match-retail">
+  <div class="match-head">
+    <h2>🛒 ニトリHD vs イオン</h2>
+    <p>どちらも身近な小売の会社。でも箱の大きさは<b>約10倍</b>違い、純資産の割合(自己資本比率)は <b>62.9% vs 7.9%</b> と正反対。「イオン危ないの!?」――いえいえ、箱の中身をよく見ると意外な理由が隠れています。</p>
+  </div>
+
+  <div class="scale-toggle" data-match="retail">
+    <button class="on" data-mode="scale">💰 金額のまま比べる</button>
+    <button data-mode="shape">📐 カタチ(割合)で比べる</button>
+  </div>
+  <p class="scale-note" data-note="retail">箱の大きさ＝会社が持っている資産の大きさ(総資産)です</p>
+
+  <div class="arena">
+    <div class="boxes" data-boxes="retail"></div>
+    <p class="tap-hint">☝ 箱をタップすると、その会社の解説が出ます</p>
+  </div>
+
+  <div class="details" data-details="retail">
+    <div class="dcard" data-co="nitori" style="border-left-color:var(--equity);">
+      <h3>🛋 ニトリHD ― 小さくても筋肉質、稼ぐ箱</h3>
+      <ul>
+        <li>総資産 <b class="num">約1.6兆円</b>。イオンの約10分の1の箱。でも自己資本比率は <b class="num">62.9%</b> と超健全。</li>
+        <li>商品の企画から製造・物流・販売まで自社でやる<b>「製造物流IT小売業」</b>。ムダを削って利益を残す。</li>
+        <li>売上 <b class="num">約9,122億円</b>に対して営業利益 <b class="num">約1,255億円</b> → 営業利益率 <b class="num">13.8%</b>。小売業では驚異的な高さ!</li>
+        <li>この1年も借入金を返して負債を減らし、箱の右下(純資産)をさらに厚くしました。「お、ねだん以上。」は財務も同じ。</li>
+      </ul>
+    </div>
+    <div class="dcard" data-co="aeon" style="border-left-color:var(--debt);">
+      <h3>🏬 イオン ― 銀行まで抱えた巨大インフラの箱</h3>
+      <ul>
+        <li>総資産 <b class="num">約15.4兆円</b>。スーパーだけでなく、モール、ドラッグストア、そして<b>銀行(イオン銀行)</b>まで持つ約312社の巨大グループ。</li>
+        <li>負債13.2兆円のうち <b class="num">約5.5兆円は「銀行業における預金」</b>。つまり私たちがイオン銀行に預けたお金。預金は銀行にとって「預かって返すお金」＝負債なのです!</li>
+        <li>だから自己資本比率 <b class="num">7.9%</b> は他の小売と単純比較できません。銀行事業を除くと <b class="num">14.3%</b>。それでもニトリよりは借入に頼る経営です。</li>
+        <li>売上(営業収益)は <b class="num">約10.7兆円</b>で日本の小売トップ級。営業利益 <b class="num">約2,705億円</b> → 営業利益率 <b class="num">約2.5%</b>。薄い利益を巨大な規模でカバーする戦略。</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="quiz">
+    <h2><span>クイズに挑戦</span></h2>
+    <p class="qsub">こちらは少しひねった問題。会計事務所の腕の見せどころです。</p>
+
+    <div class="q">
+      <span class="qlabel">Q1</span>
+      <p class="question">イオンの負債13.2兆円のうち約5.5兆円を占める、意外な項目は?</p>
+      <div class="choices">
+        <button data-a="0">売れ残った食品</button>
+        <button data-a="0">ショッピングモールの建設費の未払い</button>
+        <button data-a="1">お客さんがイオン銀行に預けた預金</button>
+      </div>
+      <div class="answer">
+        <span class="atag">こたえ</span>
+        <p>イオンはグループにイオン銀行を持っています。私たちの<b>預金は、銀行から見ると「預かっていて、求められたら返すお金」＝負債</b>。だから銀行を抱える会社の箱は、右上(負債)がドーンと大きくなります。同じ「負債」でも、借金と預金ではまったく意味が違う――<b>箱のラベルだけでなく中身を見る</b>のがプロの仕事です。</p>
+      </div>
+    </div>
+
+    <div class="q">
+      <span class="qlabel">Q2</span>
+      <p class="question">自己資本比率はニトリ62.9%、イオン7.9%。じゃあイオンは「危ない会社」?</p>
+      <div class="choices">
+        <button data-a="0">危ない。今すぐ全店閉店すべき</button>
+        <button data-a="1">業種がちがうので単純比較できない。銀行業を含む会社の比率は低く出る</button>
+        <button data-a="0">自己資本比率は大きいほど悪い数字だから、イオンの方が優秀</button>
+      </div>
+      <div class="answer">
+        <span class="atag">こたえ</span>
+        <p>銀行業は<b>お客さんの預金(負債)を元手に運用する商売</b>なので、自己資本比率はどうしても低くなります(銀行だけの会社だと数%が普通)。イオンの決算書にも、わざわざ「金融を除くと14.3%」という数字が併記されています。<b>数字はいつも「何と比べるか」「どんな商売か」とセットで読む</b>。これが会計の面白さであり、会計事務所がお客様の数字を業界水準と比べて助言する理由です。</p>
+      </div>
+    </div>
+
+    <div class="q">
+      <span class="qlabel">Q3</span>
+      <p class="question">売上はイオン約10.7兆円、ニトリ約0.9兆円と12倍近い差。でも「売上100円あたりの本業のもうけ(営業利益率)」で勝つのはどっち?</p>
+      <div class="choices">
+        <button data-a="1">ニトリ(約13.8円) ― イオンは約2.5円</button>
+        <button data-a="0">イオン ― 大きい会社ほど利益率も高い</button>
+        <button data-a="0">まったく同じ。小売業はみんな同じ利益率と法律で決まっている</button>
+      </div>
+      <div class="answer">
+        <span class="atag">こたえ</span>
+        <p>ニトリの営業利益率は<b>約13.8%</b>、イオンは<b>約2.5%</b>。ニトリは商品を自分で企画・製造・輸入・販売する仕組みで利益を厚く残し、イオンは<b>薄い利益×巨大な規模</b>で戦います。「大きい会社＝もうかる会社」とは限らない。<b>箱の大きさ(総資産)、売上、利益率は全部別の物差し</b>です。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="think">
+    <h3>🤔 もっと考えてみよう</h3>
+    <p>長野県のスーパーや家具屋さんの箱は、ニトリ型とイオン型のどちらに近いでしょう? 地元企業の多くは、お店や倉庫を借金で建てるところからスタートします。その会社の箱が年々どう変わっていくかを一緒に見守り、応援するのが、私たち会計事務所の仕事です。</p>
+  </div>
+</section>
+
+<footer>
+  <p><b>データの出典と注意</b><br>
+  各社の決算短信・決算発表資料より作成(任天堂・ソニーグループ・ニトリホールディングス:2026年3月期／イオン:2026年2月期)。金額は概数で、学習用にわかりやすく単純化しています。ソニーグループの純資産は親会社の所有者に帰属する持分を基に概算しています。会計基準(日本基準/IFRS)の違いによる細かな差異は捨象しています。投資判断の材料にはしないでください。</p>
+  <p style="margin-top:10px;"><b>三澤会計グループ</b> ― お仕事体験プログラム 応用編</p>
+  <a class="backlink" href="../">← 仕訳シミュレーターにもどる</a>
+</footer>
+
+</div>
+
+<script>
+// ============ data (億円) ============
+const DATA = {
+  game: [
+    {
+      key:"nintendo", name:"任天堂",
+      total:38053, debt:8502, equity:29551,
+      ratio:"77.6", assetNote:"うち現金など 約1.3兆円",
+      totalLabel:"約3.8兆円"
+    },
+    {
+      key:"sony", name:"ソニーグループ",
+      total:156834, debt:75644, equity:81190,
+      ratio:"約52", assetNote:"ゲーム・音楽・映画・半導体…",
+      totalLabel:"約15.7兆円"
+    }
+  ],
+  retail: [
+    {
+      key:"nitori", name:"ニトリHD",
+      total:15713, debt:5827, equity:9886,
+      ratio:"62.9", assetNote:"店舗・倉庫・商品など",
+      totalLabel:"約1.6兆円"
+    },
+    {
+      key:"aeon", name:"イオン",
+      total:153697, debt:131654, equity:22043,
+      ratio:"7.9", assetNote:"店舗・モール・銀行の貸出金…",
+      totalLabel:"約15.4兆円"
+    }
+  ]
+};
+const MAX_H = () => window.innerWidth < 480 ? 340 : 430;
+const modes = { game:"scale", retail:"scale" };
+
+function render(matchKey){
+  const wrap = document.querySelector(`[data-boxes="${matchKey}"]`);
+  const companies = DATA[matchKey];
+  const maxTotal = Math.max(...companies.map(c=>c.total));
+  const mode = modes[matchKey];
+  wrap.innerHTML = "";
+  companies.forEach(c=>{
+    const h = mode==="scale" ? Math.max(34, c.total/maxTotal*MAX_H()) : MAX_H()*0.82;
+    const debtFlex = c.debt/c.total, eqFlex = c.equity/c.total;
+    const small = h < 110;
+    const el = document.createElement("div");
+    el.className = "company";
+    el.innerHTML = `
+      <div class="c-name">${c.name}</div>
+      <div class="c-total">総資産 <b>${c.totalLabel}</b></div>
+      <div class="bsbox" style="height:${h}px" data-co="${c.key}" role="button" tabindex="0" aria-label="${c.name}の箱。タップで解説を表示">
+        <div class="col">
+          <div class="seg asset ${small?'hide-label':''}" style="flex:1">
+            <span>資産</span><small>${c.assetNote}</small>
+          </div>
+        </div>
+        <div class="col">
+          <div class="seg debt ${small?'hide-label':''}" style="flex:${debtFlex}">
+            <span>負債</span><small>${fmt(c.debt)}</small>
+          </div>
+          <div class="seg equity ${small?'hide-label':''}" style="flex:${eqFlex}">
+            <span>純資産</span><small>${fmt(c.equity)}</small>
+          </div>
+        </div>
+      </div>
+      <div class="ratio-badge">自己資本比率 <b>${c.ratio}%</b></div>
+    `;
+    wrap.appendChild(el);
+  });
+  // tap → detail
+  wrap.querySelectorAll(".bsbox").forEach(box=>{
+    const open = ()=>{
+      const co = box.dataset.co;
+      const cards = document.querySelectorAll(`[data-details="${matchKey}"] .dcard`);
+      cards.forEach(cd=>cd.classList.toggle("show", cd.dataset.co===co));
+      document.querySelector(`[data-details="${matchKey}"] .dcard.show`)
+        ?.scrollIntoView({behavior:"smooth", block:"nearest"});
+    };
+    box.addEventListener("click", open);
+    box.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){e.preventDefault();open();} });
+  });
+}
+function fmt(oku){
+  if(oku>=10000){
+    const cho = (oku/10000).toFixed(1).replace(/\.0$/,"");
+    return "約"+cho+"兆円";
+  }
+  return "約"+Math.round(oku/100)*100+"億円";
+}
+
+// scale toggles
+document.querySelectorAll(".scale-toggle").forEach(tg=>{
+  const matchKey = tg.dataset.match;
+  tg.querySelectorAll("button").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      tg.querySelectorAll("button").forEach(b=>b.classList.remove("on"));
+      btn.classList.add("on");
+      modes[matchKey] = btn.dataset.mode;
+      document.querySelector(`[data-note="${matchKey}"]`).textContent =
+        btn.dataset.mode==="scale"
+          ? "箱の大きさ＝会社が持っている資産の大きさ(総資産)です"
+          : "大きさをそろえて、中身の割合(カタチ)だけを比べています";
+      render(matchKey);
+    });
+  });
+});
+
+// tabs
+document.querySelectorAll(".tab").forEach(tab=>{
+  tab.addEventListener("click", ()=>{
+    document.querySelectorAll(".tab").forEach(t=>t.setAttribute("aria-selected","false"));
+    tab.setAttribute("aria-selected","true");
+    document.querySelectorAll(".match").forEach(m=>m.classList.remove("active"));
+    document.getElementById("match-"+tab.dataset.match).classList.add("active");
+  });
+});
+
+// quiz
+document.querySelectorAll(".q").forEach(q=>{
+  q.querySelectorAll(".choices button").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      if(q.dataset.done) return;
+      q.dataset.done = "1";
+      q.querySelectorAll(".choices button").forEach(b=>{
+        b.classList.add(b.dataset.a==="1" ? "correct" : "wrong");
+        b.disabled = true;
+      });
+      q.querySelector(".answer").classList.add("show");
+    });
+  });
+});
+
+let resizeTimer;
+window.addEventListener("resize", ()=>{
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(()=>{ render("game"); render("retail"); }, 200);
+});
+
+render("game");
+render("retail");
+</script>
+</body>
+</html>
