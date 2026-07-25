@@ -344,8 +344,9 @@ function App() {
   const [amt, setAmt] = useState(10);
   const [err, setErr] = useState("");
   const [showHint, setShowHint] = useState(false);
-  const [showRescue, setShowRescue] = useState(false);
-  const [showCheck, setShowCheck] = useState(false);
+  const [attempts, setAttempts] = useState(0);
+  const [feedback, setFeedback] = useState("");
+  const [showAnswer, setShowAnswer] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
@@ -364,25 +365,10 @@ function App() {
   const scale = 240 / maxTotal;
   const minH = 262;
 
-  // ---- 答え合わせ: お題との照合(○=一致、△=左右逆or金額違い、－=お題以外) ----
-  const checkResults = useMemo(() => {
-    if (!preset) return { res: [], cleared: 0 };
-    const used = preset.missions.map(() => false);
-    const res = entries.map(() => null);
-    entries.forEach((e, i) => {
-      const j = preset.missions.findIndex((m, idx) => !used[idx] && m.d === e.d && m.c === e.c && m.amt === Number(e.amt));
-      if (j >= 0) { used[j] = true; res[i] = { mark: "○", note: `お題${j + 1}` }; }
-    });
-    entries.forEach((e, i) => {
-      if (res[i]) return;
-      let j = preset.missions.findIndex((m, idx) => !used[idx] && m.d === e.c && m.c === e.d && m.amt === Number(e.amt));
-      if (j >= 0) { used[j] = true; res[i] = { mark: "△", note: `お題${j + 1}? 左右が逆かも` }; return; }
-      j = preset.missions.findIndex((m, idx) => !used[idx] && m.d === e.d && m.c === e.c);
-      if (j >= 0) { used[j] = true; res[i] = { mark: "△", note: `お題${j + 1}? 金額をたしかめて` }; return; }
-      res[i] = { mark: "－", note: "お題以外の取引" };
-    });
-    return { res, cleared: res.filter((r) => r && r.mark === "○").length };
-  }, [entries, companyKey]);
+  // ---- ガイド進行: お題は1問ずつ。正解すると次の問題へ ----
+  const progress = preset ? Math.min(entries.length, preset.missions.length) : 0;
+  const missionsDone = preset ? entries.length >= preset.missions.length : false;
+  const currentMission = preset && !missionsDone ? preset.missions[progress] : null;
 
   // 自動保存: 会社・仕訳・メモを同じ端末のブラウザに保存
   useEffect(() => {
@@ -391,14 +377,30 @@ function App() {
 
   const addEntry = (entry) => {
     setErr("");
+    setFeedback("");
     const e = entry || { d, c, amt: Number(amt) };
     if (!e.amt || e.amt <= 0) return setErr("金額は1以上で入力してください。");
     if (e.d === e.c) return setErr("借方と貸方が同じ科目です。取引にならないので見直しましょう。");
+    const wasGuided = !missionsDone;
+    if (wasGuided) {
+      const m = preset.missions[progress];
+      const exact = m.d === e.d && m.c === e.c && Number(m.amt) === Number(e.amt);
+      if (!exact) {
+        setAttempts(attempts + 1);
+        if (m.d === e.c && m.c === e.d && Number(m.amt) === Number(e.amt)) setFeedback("△ おしい! 借方(左)と貸方(右)が逆かもしれません。");
+        else if (m.d === e.d && m.c === e.c) setFeedback("△ 科目は合っています。金額をもう一度たしかめよう。");
+        else setFeedback("△ 科目がちがうかも。💡ヒントの早見表を見てみよう。");
+        return;
+      }
+    }
     const next = computeBalances(preset, [...entries, e]);
     for (const k of [...ASSETS, ...LIABS])
       if (next[k] < 0)
         return setErr(`この取引をすると「${k}」がマイナスになってしまいます(${next[k]})。実際の会社ではできない取引です。`);
     setEntries([...entries, e]);
+    setAttempts(0);
+    setShowAnswer(false);
+    setFeedback(wasGuided ? "○ 正解! 右の箱がどう動いたか見てみよう。" : "○ 記録しました。");
   };
 
   const performReset = () => {
@@ -406,6 +408,9 @@ function App() {
     setMemo({ year: "", worry: "", advice: "" });
     setErr("");
     setSaveMsg("");
+    setAttempts(0);
+    setFeedback("");
+    setShowAnswer(false);
     setConfirmReset(false);
   };
 
@@ -505,7 +510,7 @@ function App() {
             {navBtn("input", "② 仕訳を入力", !companyKey)}
             <button onClick={() => {
                 if (!companyKey || tab === "present") return;
-                if (checkResults.cleared >= preset.missions.length) { setTab("present"); setConfirmPresent(false); }
+                if (missionsDone) { setTab("present"); setConfirmPresent(false); }
                 else setConfirmPresent(true);
               }}
               className="px-3 py-1.5 rounded-full text-sm font-bold print-hide"
@@ -535,7 +540,7 @@ function App() {
         {confirmPresent && tab !== "present" && preset && (
           <div className="print-hide flex flex-wrap items-center gap-3 mb-4 rounded-xl px-4 py-3" style={{ background: "#EEEDFE", border: "1.5px solid #B9B4E8" }}>
             <span className="text-sm font-bold" style={{ color: "#26215C" }}>
-              まだお題の仕訳が残っています(クリア {checkResults.cleared}／{preset.missions.length})。このままプレゼン画面へ進みますか?
+              まだお題の仕訳が残っています(クリア {progress}／{preset.missions.length})。このままプレゼン画面へ進みますか?
             </span>
             <button onClick={() => { setTab("present"); setConfirmPresent(false); }} className="rounded-lg px-3 py-1.5 text-sm font-bold text-white" style={{ background: "#26215C" }}>進む</button>
             <button onClick={() => setConfirmPresent(false)} className="rounded-lg px-3 py-1.5 text-sm font-bold" style={{ border: "1.5px solid #5F5E5A", color: "#5F5E5A", background: "transparent" }}>仕訳にもどる</button>
@@ -551,7 +556,8 @@ function App() {
                 <button key={k}
                   onClick={() => {
                     if (companyKey === k) { setTab("input"); return; }
-                    setCompanyKey(k); setEntries([]); setMemo({ year: "", worry: "", advice: "" }); setConfirmPresent(false); setTab("input");
+                    setCompanyKey(k); setEntries([]); setMemo({ year: "", worry: "", advice: "" }); setConfirmPresent(false);
+                    setAttempts(0); setFeedback(""); setShowAnswer(false); setErr(""); setTab("input");
                   }}
                   className="rounded-xl p-4 text-left hover:shadow-md transition-shadow"
                   style={{ background: "#fff", border: companyKey === k ? "2.5px solid #26215C" : "1.5px solid #E2E1DB" }}>
@@ -567,20 +573,20 @@ function App() {
               ))}
             </div>
 
-            {/* ---------- 応用編(おうちで挑戦) ---------- */}
+            {/* ---------- 仕事体験・後半(応用編)への入口 ---------- */}
             <div className="mt-8">
               <div className="flex items-center gap-3 mb-3">
                 <div className="flex-1 h-px" style={{ background: "#E2E1DB" }} />
-                <span className="text-[11px] font-bold tracking-widest" style={{ color: "#5F5E5A" }}>ここから先は じゆうけんきゅう</span>
+                <span className="text-[11px] font-bold tracking-widest" style={{ color: "#5F5E5A" }}>ここから先は 仕事体験・後半</span>
                 <div className="flex-1 h-px" style={{ background: "#E2E1DB" }} />
               </div>
               <a href="./ouyou/" className="block rounded-xl p-4 hover:shadow-md transition-shadow relative overflow-hidden"
                  style={{ background: "#26215C", color: "#fff", border: "1.5px solid #26215C" }}>
                 <span className="inline-block rounded-full px-3 py-0.5 text-[11px] font-extrabold mb-1.5"
-                      style={{ background: "#FFE27A", color: "#26215C" }}>応用編｜その場でも・おうちでもOK</span>
+                      style={{ background: "#FFE27A", color: "#26215C" }}>仕事体験・後半｜応用編</span>
                 <div className="font-extrabold">箱でわかる会社のカタチ ― 有名企業くらべ</div>
                 <div className="text-[12px] mt-1 pr-16" style={{ color: "#D9D6F2" }}>
-                  任天堂 vs ソニー、ニトリ vs イオン。本物の決算書の数字で、会社の「箱」を比べてみよう。クイズつき。
+                  任天堂 vs ソニー、ニトリ vs イオン。同じ業種でも「箱」の形はこんなに違う。本物の決算書の数字でくらべてみよう。クイズつき。
                 </div>
                 <div className="absolute right-4 bottom-3 flex items-end gap-1" aria-hidden="true" style={{ opacity: 0.55 }}>
                   <div style={{ width: 12, height: 34, background: "#9FE1CB", borderRadius: 2 }} />
@@ -594,164 +600,159 @@ function App() {
 
         {/* ---------- STEP 2 ---------- */}
         {tab === "input" && preset && (
-          <div>
-            <div className="grid md:grid-cols-[1fr_1.2fr] gap-5">
-              <div>
-                <div className="rounded-xl p-4 mb-4" style={{ background: "#fff", border: "1.5px solid #E2E1DB" }}>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="font-extrabold" style={{ color: "#26215C" }}>仕訳を入力する ― {preset.name}</div>
-                    <button onClick={() => setShowHint(!showHint)}
-                      className="text-xs font-bold rounded-full px-3 py-1"
-                      style={{ background: showHint ? "#26215C" : "#EEEDFE", color: showHint ? "#fff" : "#26215C" }}>
-                      {showHint ? "ヒントをとじる" : "💡 ヒント"}
-                    </button>
-                  </div>
-                  {showHint && (
-                    <div className="rounded-lg px-3 py-3 mb-3 text-[12px]" style={{ background: "#EEEDFE", color: "#26215C" }}>
-                      <div className="font-extrabold mb-1">かんたん3ステップ</div>
-                      <div>1. この取引で「増えたモノ・使ったお金」は? → それを<b>左(借方)</b>に</div>
-                      <div>2. 「お金はどこから来た? 何が減った?」 → それを<b>右(貸方)</b>に</div>
-                      <div className="mb-2">3. 金額は左右おなじ</div>
-                      <div className="font-extrabold mb-1">よくある取引の早見表(左 ／ 右)</div>
-                      {HINT_TABLE.map((h, i) => (
-                        <div key={i} className="flex justify-between gap-2" style={{ borderTop: "1px solid #DDDBF5", padding: "2px 0" }}>
-                          <span>{h[0]}</span><span className="font-bold shrink-0">{h[1]}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <div className="text-[11px] mb-3" style={{ color: "#5F5E5A" }}>
-                    借方(左) = 増えたモノ・使ったお金 ／ 貸方(右) = お金の出どころ・減ったモノ
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <select value={d} onChange={(e) => setD(e.target.value)} className="rounded-lg px-2 py-2 text-sm" style={{ border: "1.5px solid #CFCEC8", background: "#fff" }}>
-                      {ALL_INPUT.map((k) => <option key={k}>{k}</option>)}
-                    </select>
-                    <span className="text-sm font-bold">／</span>
-                    <select value={c} onChange={(e) => setC(e.target.value)} className="rounded-lg px-2 py-2 text-sm" style={{ border: "1.5px solid #CFCEC8", background: "#fff" }}>
-                      {ALL_INPUT.map((k) => <option key={k}>{k}</option>)}
-                    </select>
-                    <input type="number" value={amt} min={1} step={5} onChange={(e) => setAmt(e.target.value)}
-                      className="rounded-lg px-2 py-2 text-sm w-20" style={{ border: "1.5px solid #CFCEC8" }} />
-                    <button onClick={() => addEntry()} className="rounded-lg px-4 py-2 text-sm font-bold text-white" style={{ background: "#26215C" }}>
-                      記録する
-                    </button>
-                  </div>
-                  {err && <div className="text-xs font-bold mt-2 rounded-lg px-3 py-2" style={{ color: "#A32D2D", background: "#FBEDED" }}>{err}</div>}
+          <div className="grid md:grid-cols-[1fr_1.2fr] gap-5">
+            <div>
+              <div className="rounded-xl p-4 mb-4" style={{ background: "#fff", border: "1.5px solid #E2E1DB" }}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="font-extrabold" style={{ color: "#26215C" }}>仕訳を入力する ― {preset.name}</div>
+                  <button onClick={() => setShowHint(!showHint)}
+                    className="text-xs font-bold rounded-full px-3 py-1"
+                    style={{ background: showHint ? "#26215C" : "#EEEDFE", color: showHint ? "#fff" : "#26215C" }}>
+                    {showHint ? "ヒントをとじる" : "💡 ヒント"}
+                  </button>
                 </div>
-
-                <div className="rounded-xl p-4 mb-4" style={{ background: "#fff", border: "1.5px solid #E2E1DB" }}>
-                  <div className="font-extrabold text-sm mb-2" style={{ color: "#26215C" }}>お題 ― この6つの取引を順番に仕訳してみよう</div>
-                  {preset.missions.map((m, i) => (
-                    <div key={i} className="py-1.5 text-[13px]" style={{ borderTop: i ? "1px solid #EFEEE8" : "none" }}>
-                      {i + 1}. {m.text}
-                    </div>
-                  ))}
-                  <div className="text-[11px] mt-2" style={{ color: "#8B8A85" }}>
-                    どうしてもわからないときは、ページのいちばん下に助け舟があります。
-                  </div>
-                </div>
-
-                <div className="rounded-xl p-4" style={{ background: "#fff", border: "1.5px solid #E2E1DB" }}>
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="font-extrabold text-sm" style={{ color: "#26215C" }}>仕訳帳({entries.length}件)</div>
-                    {entries.length > 0 && (
-                      <button onClick={() => setShowCheck(!showCheck)}
-                        className="text-xs font-bold rounded-full px-3 py-1"
-                        style={{ background: showCheck ? "#26215C" : "#EEEDFE", color: showCheck ? "#fff" : "#26215C" }}>
-                        {showCheck ? "答え合わせを隠す" : "✓ 答え合わせ"}
-                      </button>
-                    )}
-                  </div>
-                  {entries.length === 0 && <div className="text-xs" style={{ color: "#8B8A85" }}>まだ記録がありません。最初の取引を入力してみよう。</div>}
-                  {entries.map((e, i) => {
-                    const r = checkResults.res[i];
-                    const markColor = r && r.mark === "○" ? "#0B5E38" : r && r.mark === "△" ? "#B07600" : "#8B8A85";
-                    return (
-                      <div key={i} className="flex items-center justify-between gap-2 text-[13px] py-1" style={{ borderTop: i ? "1px solid #EFEEE8" : "none" }}>
-                        <span className="flex items-center gap-1.5 flex-wrap">
-                          {showCheck && r && (
-                            <span className="font-extrabold" style={{ color: markColor }}>{r.mark}</span>
-                          )}
-                          <span>{i + 1}. {e.d} {e.amt} ／ {e.c} {e.amt}</span>
-                          {showCheck && r && (
-                            <span className="text-[10px]" style={{ color: markColor }}>({r.note})</span>
-                          )}
-                        </span>
-                        <button onClick={() => setEntries(entries.filter((_, j) => j !== i))} className="text-[11px] shrink-0" style={{ color: "#A32D2D" }}>取消</button>
+                {showHint && (
+                  <div className="rounded-lg px-3 py-3 mb-3 text-[12px]" style={{ background: "#EEEDFE", color: "#26215C" }}>
+                    <div className="font-extrabold mb-1">かんたん3ステップ</div>
+                    <div>1. この取引で「増えたモノ・使ったお金」は? → それを<b>左(借方)</b>に</div>
+                    <div>2. 「お金はどこから来た? 何が減った?」 → それを<b>右(貸方)</b>に</div>
+                    <div className="mb-2">3. 金額は左右おなじ</div>
+                    <div className="font-extrabold mb-1">よくある取引の早見表(左 ／ 右)</div>
+                    {HINT_TABLE.map((h, i) => (
+                      <div key={i} className="flex justify-between gap-2" style={{ borderTop: "1px solid #DDDBF5", padding: "2px 0" }}>
+                        <span>{h[0]}</span><span className="font-bold shrink-0">{h[1]}</span>
                       </div>
-                    );
-                  })}
-                  {showCheck && entries.length > 0 && (
-                    <div className="text-xs font-bold mt-2 rounded-lg px-3 py-2"
-                      style={{ background: checkResults.cleared === preset.missions.length ? "#EAF4DC" : "#F1EFE8", color: "#26215C" }}>
-                      お題クリア: {checkResults.cleared} ／ {preset.missions.length}
-                      {checkResults.cleared === preset.missions.length ? " 全問クリア! 「③ 社長にプレゼン」へ進もう🎉" : ""}
-                    </div>
-                  )}
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex items-center gap-1.5 mb-2">
+                  {preset.missions.map((_, i) => (
+                    <span key={i} className="flex items-center justify-center rounded-full text-[10px] font-bold"
+                      style={{
+                        width: 20, height: 20,
+                        background: i < progress ? "#26215C" : "transparent",
+                        color: i < progress ? "#fff" : i === progress && !missionsDone ? "#26215C" : "#B4B3AE",
+                        border: "1.5px solid " + (i < progress || (i === progress && !missionsDone) ? "#26215C" : "#D9D8D2"),
+                      }}>
+                      {i < progress ? "✓" : i + 1}
+                    </span>
+                  ))}
                 </div>
+
+                {!missionsDone && currentMission ? (
+                  <div className="rounded-lg px-3 py-3 mb-3" style={{ background: "#FFF9E9", border: "1.5px solid #EFD9A0" }}>
+                    <div className="text-[11px] font-bold mb-0.5" style={{ color: "#6B4E00" }}>お題 {progress + 1} ／ {preset.missions.length}</div>
+                    <div className="text-[14px] font-bold" style={{ color: "#2C2C2A" }}>{currentMission.text}</div>
+                    <div className="text-[11px] mt-1" style={{ color: "#8A7A45" }}>この取引を下の欄で仕訳してみよう。正解すると次のお題に進みます。</div>
+                  </div>
+                ) : (
+                  <div className="rounded-lg px-3 py-2.5 mb-3 text-[13px] font-bold" style={{ background: "#EAF4DC", color: "#173404" }}>
+                    全問クリア! 🎉 ここからは自由に取引を追加してOK。準備ができたら「③ 社長にプレゼン」へ進もう。
+                  </div>
+                )}
+
+                <div className="text-[11px] mb-2" style={{ color: "#5F5E5A" }}>
+                  借方(左) = 増えたモノ・使ったお金 ／ 貸方(右) = お金の出どころ・減ったモノ
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <select value={d} onChange={(e) => setD(e.target.value)} className="rounded-lg px-2 py-2 text-sm" style={{ border: "1.5px solid #CFCEC8", background: "#fff" }}>
+                    {ALL_INPUT.map((k) => <option key={k}>{k}</option>)}
+                  </select>
+                  <span className="text-sm font-bold">／</span>
+                  <select value={c} onChange={(e) => setC(e.target.value)} className="rounded-lg px-2 py-2 text-sm" style={{ border: "1.5px solid #CFCEC8", background: "#fff" }}>
+                    {ALL_INPUT.map((k) => <option key={k}>{k}</option>)}
+                  </select>
+                  <input type="number" value={amt} min={1} step={5} onChange={(e) => setAmt(e.target.value)}
+                    className="rounded-lg px-2 py-2 text-sm w-20" style={{ border: "1.5px solid #CFCEC8" }} />
+                  <button onClick={() => addEntry()} className="rounded-lg px-4 py-2 text-sm font-bold text-white" style={{ background: "#26215C" }}>
+                    記録する
+                  </button>
+                </div>
+                {feedback && (
+                  <div className="text-[13px] font-bold mt-2 rounded-lg px-3 py-2"
+                    style={{
+                      background: feedback.startsWith("○") ? "#EAF4DC" : "#FFF3D6",
+                      color: feedback.startsWith("○") ? "#173404" : "#6B4E00",
+                    }}>
+                    {feedback}
+                  </div>
+                )}
+                {err && <div className="text-xs font-bold mt-2 rounded-lg px-3 py-2" style={{ color: "#A32D2D", background: "#FBEDED" }}>{err}</div>}
+                {!missionsDone && attempts >= 2 && (
+                  showAnswer && currentMission ? (
+                    <div className="flex flex-wrap items-center gap-2 text-xs mt-2 rounded-lg px-3 py-2" style={{ background: "#F1EFE8" }}>
+                      <span>答え: <b>{currentMission.d} {currentMission.amt}</b> ／ <b>{currentMission.c} {currentMission.amt}</b></span>
+                      <button onClick={() => addEntry(currentMission)} className="text-[11px] font-bold rounded px-2 py-0.5" style={{ border: "1px solid #26215C", color: "#26215C" }}>
+                        この仕訳で記録する
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setShowAnswer(true)} className="text-xs font-bold mt-2 underline" style={{ color: "#5F5E5A" }}>
+                      🆘 どうしてもわからない… 答えを見る
+                    </button>
+                  )
+                )}
               </div>
 
               <div className="rounded-xl p-4" style={{ background: "#fff", border: "1.5px solid #E2E1DB" }}>
-                <div className="font-extrabold mb-3" style={{ color: "#26215C" }}>いまの箱の形</div>
-                <div className="flex flex-wrap gap-8 justify-center">
-                  <div>
-                    <div className="text-xs font-bold text-center mb-1">貸借対照表(B/S)</div>
-                    <BSPair start={start} bal={bal} showDelta scale={scale} minH={minH} />
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-center mb-1">損益計算書(P/L)</div>
-                    {bal.売上 === 0 && profitOf(bal) === 0 ? (
-                      <div className="flex items-center justify-center text-xs rounded-lg border border-dashed px-4 text-center"
-                        style={{ color: "#8B8A85", borderColor: "#CFCEC8", minHeight: minH, width: 190 }}>
-                        まだ売上の取引が<br />ありません
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center">
-                        <div className="flex gap-1.5">
-                          <Column items={[{ label: "売上", value: bal.売上, ...ACC.売上 }]} scale={scale} caption="稼いだお金" minH={minH} />
-                          <Column items={[...EXPS.map((k) => ({ label: k, value: bal[k], ...ACC[k] })),
-                            ...(profitOf(bal) > 0 ? [{ label: "利益", value: profitOf(bal), ...PROFIT_FILL }] : [])]}
-                            scale={scale} caption="使い道" minH={minH} />
-                        </div>
-                        {profitOf(bal) < 0 && (
-                          <div className="text-[11px] font-bold mt-1" style={{ color: "#A32D2D" }}>
-                            損失 {profitOf(bal)}(稼ぎより使ったお金が多い!)
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="font-extrabold text-sm" style={{ color: "#26215C" }}>仕訳帳({entries.length}件)</div>
+                  {entries.length > 0 && (
+                    <button onClick={() => { setEntries(entries.slice(0, -1)); setAttempts(0); setShowAnswer(false); setFeedback(""); setErr(""); }}
+                      className="text-xs font-bold rounded-full px-3 py-1"
+                      style={{ border: "1.5px solid #A32D2D", color: "#A32D2D", background: "transparent" }}>
+                      ↩ ひとつ戻る
+                    </button>
+                  )}
                 </div>
-                <div className="text-[11px] mt-3 text-center" style={{ color: "#5F5E5A" }}>
-                  ( )内は期首からの増減。緑の「利益」は純資産の上に積み上がります。
-                </div>
+                {entries.length === 0 && <div className="text-xs" style={{ color: "#8B8A85" }}>まだ記録がありません。お題1の取引を仕訳してみよう。</div>}
+                {entries.map((e, i) => (
+                  <div key={i} className="flex items-center gap-1.5 text-[13px] py-1" style={{ borderTop: i ? "1px solid #EFEEE8" : "none" }}>
+                    <span className="font-extrabold" style={{ color: i < preset.missions.length ? "#0B5E38" : "#8B8A85" }}>
+                      {i < preset.missions.length ? "○" : "－"}
+                    </span>
+                    <span>{i + 1}. {e.d} {e.amt} ／ {e.c} {e.amt}</span>
+                    <span className="text-[10px]" style={{ color: "#8B8A85" }}>({i < preset.missions.length ? `お題${i + 1}` : "自由入力"})</span>
+                  </div>
+                ))}
               </div>
             </div>
 
-            {/* ---------- rescue section at the very bottom ---------- */}
-            <div className="mt-8 rounded-xl p-4" style={{ background: "#F6F5F0", border: "1.5px dashed #C9C8C0" }}>
-              <button onClick={() => setShowRescue(!showRescue)} className="w-full text-left font-extrabold text-sm" style={{ color: "#5F5E5A" }}>
-                🆘 ピンチのときは(お題の答え) {showRescue ? "▲ とじる" : "▼ ひらく"}
-              </button>
-              {showRescue && (
-                <div className="mt-3">
-                  <div className="text-[11px] mb-2" style={{ color: "#8B8A85" }}>
-                    まずは自分たちで考えてから開こう。「入力」を押すと、その仕訳がそのまま記録されます。
-                  </div>
-                  {preset.missions.map((m, i) => (
-                    <div key={i} className="flex flex-wrap items-center justify-between gap-2 py-1.5 text-[13px]" style={{ borderTop: i ? "1px solid #E5E4DD" : "none" }}>
-                      <span>{i + 1}. {m.text}</span>
-                      <span className="flex items-center gap-2 shrink-0">
-                        <span className="text-xs">答え: <b>{m.d} {m.amt}</b> ／ <b>{m.c} {m.amt}</b></span>
-                        <button onClick={() => addEntry(m)} className="text-[11px] font-bold rounded px-2 py-0.5" style={{ border: "1px solid #26215C", color: "#26215C" }}>
-                          入力
-                        </button>
-                      </span>
-                    </div>
-                  ))}
+            <div className="rounded-xl p-4" style={{ background: "#fff", border: "1.5px solid #E2E1DB" }}>
+              <div className="font-extrabold mb-3" style={{ color: "#26215C" }}>いまの箱の形</div>
+              <div className="flex flex-wrap gap-8 justify-center">
+                <div>
+                  <div className="text-xs font-bold text-center mb-1">貸借対照表(B/S)</div>
+                  <BSPair start={start} bal={bal} showDelta scale={scale} minH={minH} />
                 </div>
-              )}
+                <div>
+                  <div className="text-xs font-bold text-center mb-1">損益計算書(P/L)</div>
+                  {bal.売上 === 0 && profitOf(bal) === 0 ? (
+                    <div className="flex items-center justify-center text-xs rounded-lg border border-dashed px-4 text-center"
+                      style={{ color: "#8B8A85", borderColor: "#CFCEC8", minHeight: minH, width: 190 }}>
+                      まだ売上の取引が<br />ありません
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center">
+                      <div className="flex gap-1.5">
+                        <Column items={[{ label: "売上", value: bal.売上, ...ACC.売上 }]} scale={scale} caption="稼いだお金" minH={minH} />
+                        <Column items={[...EXPS.map((k) => ({ label: k, value: bal[k], ...ACC[k] })),
+                          ...(profitOf(bal) > 0 ? [{ label: "利益", value: profitOf(bal), ...PROFIT_FILL }] : [])]}
+                          scale={scale} caption="使い道" minH={minH} />
+                      </div>
+                      {profitOf(bal) < 0 && (
+                        <div className="text-[11px] font-bold mt-1" style={{ color: "#A32D2D" }}>
+                          損失 {profitOf(bal)}(稼ぎより使ったお金が多い!)
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="text-[11px] mt-3 text-center" style={{ color: "#5F5E5A" }}>
+                ( )内は期首からの増減。緑の「利益」は純資産の上に積み上がります。
+              </div>
             </div>
           </div>
         )}
@@ -852,13 +853,13 @@ function App() {
           </div>
         )}
 
-        {/* ---------- 応用編への常設リンク(①以外の画面で表示・印刷時は非表示) ---------- */}
-        {tab !== "select" && (
+        {/* ---------- 後半(応用編)へのリンク(③の画面のみ・印刷時は非表示) ---------- */}
+        {tab === "present" && preset && (
           <div className="print-hide mt-8 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3" style={{ background: "#EEEDFE", border: "1.5px solid #B9B4E8" }}>
             <span className="text-[12px] font-bold" style={{ color: "#26215C" }}>
-              🎁 応用編「箱でわかる会社のカタチ ― 有名企業くらべ」は、その場でも、おうちに帰ってからでも挑戦できます
+              🏁 仕事体験・後半は「有名企業くらべ」! 同じ業種の会社どうしを、本物の決算書の数字でくらべます
             </span>
-            <a href="./ouyou/" className="shrink-0 rounded-full px-4 py-1.5 text-sm font-bold text-white" style={{ background: "#26215C" }}>応用編へ →</a>
+            <a href="./ouyou/" className="shrink-0 rounded-full px-4 py-1.5 text-sm font-bold text-white" style={{ background: "#26215C" }}>後半へすすむ →</a>
           </div>
         )}
       </div>
